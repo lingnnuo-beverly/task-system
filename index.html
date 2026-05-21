@@ -3368,30 +3368,39 @@ function renderGantt() {
   });
 
   // 今日竖线
-  const todayWeekIdx = daysBetween(earliestStart, today) / 7;
-  const todayLeft = todayWeekIdx * weekColWidth;
+  const todayDayIdx = daysBetween(earliestStart, today);
+  const todayWeekIdx = Math.floor(todayDayIdx / 7);
+  const todayDayInWeek = todayDayIdx % 7;
   html += `</tbody></table>`;
 
   container.innerHTML = html;
 
-  // 添加今日线
+  // 添加今日线（基于实际 DOM 位置）
   const table = container.querySelector('.gantt-table');
-  if (table && todayWeekIdx >= 0) {
-    const indicator = document.createElement('div');
-    indicator.style.cssText = `
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: 2px;
-      background: var(--accent);
-      pointer-events: none;
-      z-index: 5;
-    `;
-    // 计算位置需要考虑名称列宽度
-    const nameColWidth = 200;
-    indicator.style.left = `${nameColWidth + todayLeft}px`;
-    table.style.position = 'relative';
-    table.appendChild(indicator);
+  if (table && todayWeekIdx >= 0 && todayWeekIdx < totalWeeks) {
+    const headerRow = table.querySelector('thead tr:last-child');
+    const weekThs = headerRow ? headerRow.querySelectorAll('th') : [];
+    if (weekThs[todayWeekIdx]) {
+      const th = weekThs[todayWeekIdx];
+      const tableRect = table.getBoundingClientRect();
+      const thRect = th.getBoundingClientRect();
+      const thLeft = thRect.left - tableRect.left;
+      const dayOffset = (todayDayInWeek / 7) * thRect.width;
+
+      const indicator = document.createElement('div');
+      indicator.style.cssText = `
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: var(--accent);
+        pointer-events: none;
+        z-index: 5;
+      `;
+      indicator.style.left = `${thLeft + dayOffset}px`;
+      table.style.position = 'relative';
+      table.appendChild(indicator);
+    }
   }
 }
 
