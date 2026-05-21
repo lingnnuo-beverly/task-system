@@ -1913,6 +1913,18 @@
     filter: grayscale(30%);
   }
 
+  .week-gantt-bar.week-risk-red {
+    box-shadow: 0 0 0 2px var(--red), 1px 1px 3px var(--shadow);
+    animation: pulse-red 1.5s infinite;
+  }
+  .week-gantt-bar.week-risk-yellow {
+    box-shadow: 0 0 0 2px var(--yellow), 1px 1px 3px var(--shadow);
+  }
+  @keyframes pulse-red {
+    0%, 100% { box-shadow: 0 0 0 2px var(--red), 1px 1px 3px var(--shadow); }
+    50% { box-shadow: 0 0 0 3px var(--red), 0 0 8px rgba(255,59,48,0.3); }
+  }
+
   .week-gantt-bar-time {
     font-size: 10px;
     font-family: "SF Mono", Menlo, Consolas, monospace;
@@ -3284,7 +3296,8 @@ function renderGantt() {
   html += '</tr><tr>';
   for (let i = 0; i < totalWeeks; i++) {
     const w = addDays(earliestStart, i * 7);
-    html += `<th class="gantt-week-cell" title="${fmt(w)}">${w.getDate()}</th>`;
+    const isThisWeek = fmt(w) <= todayStr && fmt(addDays(w, 6)) >= todayStr;
+    html += `<th class="gantt-week-cell${isThisWeek ? ' today' : ''}" title="${fmt(w)}">${w.getMonth()+1}/${w.getDate()}</th>`;
   }
   html += '</tr></thead><tbody>';
 
@@ -3303,15 +3316,15 @@ function renderGantt() {
     const progress = calcProjectProgress(p);
     const pct = progress.pct;
 
-    // 风险样式：逾期未完成 → 红；距截止 ≤7 天且进度 <70% → 黄
+    // 风险样式：逾期未完成 → 红；距截止 ≤3 天 → 黄
     const daysToEnd = daysBetween(today, pe);
     let riskClass = '';
     if (!p.done) {
       if (today > pe) riskClass = 'risk-red';
-      else if (daysToEnd <= 7 && pct < 70) riskClass = 'risk-yellow';
+      else if (daysToEnd <= 3) riskClass = 'risk-yellow';
     }
 
-    const barLabel = `${escapeHtml(p.name)} ${pct}%`;
+    const barLabel = `${escapeHtml(p.name)}`;
 
     // 构建甘特条 tooltip：名称、日期、进度、剩余/逾期天数
     let timeStatus;
@@ -3666,7 +3679,14 @@ function renderWeekGantt() {
       track.className = 'week-gantt-track';
 
       const bar = document.createElement('div');
-      bar.className = 'week-gantt-bar' + (t.done ? ' done' : '');
+      // 逾期标红，将要逾期标黄
+      let weekBarRisk = '';
+      if (!t.done) {
+        const taskEndStr = t.endDate || t.date;
+        if (taskEndStr && taskEndStr < todayStr) weekBarRisk = ' week-risk-red';
+        else if (taskEndStr && taskEndStr === todayStr) weekBarRisk = ' week-risk-yellow';
+      }
+      bar.className = 'week-gantt-bar' + (t.done ? ' done' : '') + weekBarRisk;
       bar.style.background = barColor;
       bar.title = barTooltip;
 
