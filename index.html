@@ -3241,6 +3241,31 @@ function renderGantt() {
     return true;
   }));
 
+  // 排序：重要性高 → 逾期 → 将逾期 → 其他
+  filteredProjects.sort((a, b) => {
+    const pa = a.priority || 2;
+    const pb = b.priority || 2;
+    // 已完成的排最后
+    if (a.done && !b.done) return 1;
+    if (!a.done && b.done) return -1;
+    // 重要性优先
+    if (pa !== pb) return pa - pb;
+    // 逾期状态
+    const aOverdue = !a.done && a.end < todayStr;
+    const bOverdue = !b.done && b.end < todayStr;
+    if (aOverdue && !bOverdue) return -1;
+    if (!aOverdue && bOverdue) return 1;
+    // 将逾期（3天内）
+    const aDaysLeft = daysBetween(today, parseDate(a.end));
+    const bDaysLeft = daysBetween(today, parseDate(b.end));
+    const aSoon = !a.done && aDaysLeft <= 3 && aDaysLeft >= 0;
+    const bSoon = !b.done && bDaysLeft <= 3 && bDaysLeft >= 0;
+    if (aSoon && !bSoon) return -1;
+    if (!aSoon && bSoon) return 1;
+    // 最后按截止日期升序
+    return aDaysLeft - bDaysLeft;
+  });
+
   if (filteredProjects.length === 0) {
     const labels = { all: '全部', active: '进行中', done: '已完成', overdue: '逾期' };
     container.innerHTML = `<div class="gantt-empty">没有「${labels[ganttFilter]}」的项目</div>`;
