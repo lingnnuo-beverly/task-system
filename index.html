@@ -2464,6 +2464,15 @@
       <div class="color-picker" id="colorPicker"></div>
     </div>
     <div class="form-group">
+      <label>重要性</label>
+      <select id="projectPriority">
+        <option value="1">🔴 非常重要</option>
+        <option value="2" selected>🟡 重要</option>
+        <option value="3">🔵 一般</option>
+        <option value="4">⚪ 低优先级</option>
+      </select>
+    </div>
+    <div class="form-group">
       <label>板块（可选）</label>
       <select id="projectCategory"></select>
     </div>
@@ -2555,7 +2564,7 @@
 // =============== 数据层 ===============
 const STORAGE_KEY = 'taskSystem_v1';
 const META_KEY = 'taskSystem_meta_v1';
-const COLORS = ['#b85c2e', '#7a8b4f', '#5b7a8c', '#c89b3c', '#9d6b9b', '#b54b3a', '#5e8a7d', '#a08456'];
+const COLORS = ['#007aff','#34c759','#ff9500','#ff3b30','#af52de','#ff2d55','#5ac8fa','#ffcc00','#30b0c7','#ff6482','#4cd964','#8e44ad','#e74c3c','#1abc9c','#f39c12','#3498db'];
 
 const DEFAULT_CATEGORIES = [
   { name: '亚马逊', color: '#ff9500' },
@@ -2782,6 +2791,7 @@ function openProjectModal(id) {
     document.getElementById('projectStart').value = p.start;
     document.getElementById('projectEnd').value = p.end;
     document.getElementById('projectNotes').value = p.notes || '';
+    document.getElementById('projectPriority').value = p.priority || 2;
     selectedColor = p.color;
     document.getElementById('projectDelete').style.display = '';
     buildColorPicker();
@@ -2794,6 +2804,7 @@ function openProjectModal(id) {
     document.getElementById('projectStart').value = fmt(today);
     document.getElementById('projectEnd').value = fmt(addDays(today, 30));
     document.getElementById('projectNotes').value = '';
+    document.getElementById('projectPriority').value = 2;
     selectedColor = COLORS[state.projects.length % COLORS.length];
     document.getElementById('projectDelete').style.display = 'none';
     buildColorPicker();
@@ -2809,14 +2820,15 @@ function saveProject() {
   const end = document.getElementById('projectEnd').value;
   const notes = document.getElementById('projectNotes').value.trim();
   const category = document.getElementById('projectCategory').value || null;
+  const priority = parseInt(document.getElementById('projectPriority').value) || 2;
   if (!name || !start || !end) return alert('请填写项目名、开始日期、结束日期');
   if (parseDate(end) < parseDate(start)) return alert('结束日期不能早于开始日期');
   if (editing.id) {
     const p = state.projects.find(x => x.id === editing.id);
-    Object.assign(p, { name, start, end, color: selectedColor, notes, category });
+    Object.assign(p, { name, start, end, color: selectedColor, notes, category, priority });
   } else {
     state.projects.push({
-      id: uid(), name, start, end, color: selectedColor, notes, done: false, category
+      id: uid(), name, start, end, color: selectedColor, notes, done: false, category, priority
     });
   }
   saveState();
@@ -3341,6 +3353,7 @@ function renderGantt() {
         <div class="project-name" onclick="openProjectModal('${p.id}')">
           <span class="project-color-dot" style="background:${p.color}"></span>
           <span style="${p.done ? 'text-decoration:line-through;opacity:0.5' : ''}">${escapeHtml(p.name)}</span>
+          ${(() => { const pLabels = {1:'🔴',2:'🟡',3:'🔵',4:'⚪'}; return p.priority ? '<span style="font-size:10px;margin-left:4px">'+pLabels[p.priority]+'</span>' : ''; })()}
         </div>
         <div style="font-size:11px;color:var(--ink-light);margin-top:3px">
           ${(() => { const pCat = p.category ? (state.categories || []).find(c => c.id === p.category) : null; return pCat ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:1px 6px;border-radius:10px;background:'+pCat.color+'15;color:'+pCat.color+';border:1px solid '+pCat.color+'30;margin-right:4px"><span style="width:5px;height:5px;border-radius:50%;background:'+pCat.color+'"></span>'+escapeHtml(pCat.name)+'</span>' : ''; })()}
@@ -3554,7 +3567,7 @@ function renderWeekGantt() {
         ? (state.categories || []).find(c => c.id === t.category)
         : (project && project.category ? (state.categories || []).find(c => c.id === project.category) : null);
       // 颜色优先级：项目色 > 板块色 > 按序轮换
-      const TASK_COLORS = ['#b85c2e','#7a8b4f','#5b7a8c','#c89b3c','#9d6b9b','#b54b3a','#5e8a7d','#a08456'];
+      const TASK_COLORS = ['#007aff','#34c759','#ff9500','#ff3b30','#af52de','#ff2d55','#5ac8fa','#ffcc00','#30b0c7','#ff6482','#4cd964','#8e44ad','#e74c3c','#1abc9c','#f39c12','#3498db'];
       const barColor = project ? project.color : (cat ? cat.color : TASK_COLORS[taskIdx % TASK_COLORS.length]);
 
       // 任务实际起止日期（兼容旧数据只有 date 字段）
