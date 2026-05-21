@@ -3330,6 +3330,7 @@ function renderGantt() {
           <span style="${p.done ? 'text-decoration:line-through;opacity:0.5' : ''}">${escapeHtml(p.name)}</span>
         </div>
         <div style="font-size:11px;color:var(--ink-light);margin-top:3px">
+          ${(() => { const pCat = p.category ? (state.categories || []).find(c => c.id === p.category) : null; return pCat ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:1px 6px;border-radius:10px;background:'+pCat.color+'15;color:'+pCat.color+';border:1px solid '+pCat.color+'30;margin-right:4px"><span style="width:5px;height:5px;border-radius:50%;background:'+pCat.color+'"></span>'+escapeHtml(pCat.name)+'</span>' : ''; })()}
           ${p.start} ~ ${p.end}
           <button class="icon-btn" onclick="toggleProjectDone('${p.id}', event)" title="标记完成">${p.done ? '↺' : '✓'}</button>
           <button class="icon-btn" onclick="event.stopPropagation(); showProjectDetail('${p.id}')" title="查看详情">⋯</button>
