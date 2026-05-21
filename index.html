@@ -1159,9 +1159,21 @@
 
   /* ===== 总览首页 ===== */
   .overview-grid {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
     gap: 16px;
+  }
+  .overview-card-projects {
+    grid-row: 1 / 3;
+  }
+  .overview-card-week {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .overview-card-today {
+    grid-column: 2;
+    grid-row: 2;
   }
 
   .overview-card {
@@ -1173,6 +1185,50 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+  }
+
+  .overview-checklist {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  .overview-checklist-empty {
+    color: var(--ink-light);
+    font-size: 12px;
+    text-align: center;
+    padding: 20px 0;
+    font-style: italic;
+  }
+  .overview-check-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.12s;
+    font-size: 13px;
+  }
+  .overview-check-item:hover { background: rgba(0,0,0,0.03); }
+  .overview-check-item.done .overview-check-text {
+    text-decoration: line-through;
+    opacity: 0.5;
+  }
+  .overview-check-item input[type="checkbox"] {
+    width: 16px; height: 16px;
+    accent-color: var(--accent);
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .overview-check-text {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+    word-break: break-word;
   }
 
   .overview-projects-body {
@@ -2090,6 +2146,14 @@
     .title { font-size: 20px; letter-spacing: 1px; }
     .date-display { font-size: 12px; }
 
+    .overview-grid {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto;
+    }
+    .overview-card-projects { grid-row: auto; }
+    .overview-card-week { grid-column: 1; grid-row: auto; }
+    .overview-card-today { grid-column: 1; grid-row: auto; }
+
     .tabs {
       overflow-x: auto;
       gap: 4px;
@@ -2239,7 +2303,7 @@
   <div class="overview-metrics" id="overviewMetrics"></div>
   <div class="overview-grid">
     <!-- 长期项目 -->
-    <div class="overview-card">
+    <div class="overview-card overview-card-projects">
       <div class="overview-card-header">
         <div>
           <div class="overview-card-title">长期项目</div>
@@ -2251,7 +2315,7 @@
     </div>
 
     <!-- 本周 -->
-    <div class="overview-card">
+    <div class="overview-card overview-card-week">
       <div class="overview-card-header">
         <div>
           <div class="overview-card-title">本周</div>
@@ -2263,7 +2327,7 @@
     </div>
 
     <!-- 今日 -->
-    <div class="overview-card overview-today">
+    <div class="overview-card overview-card-today">
       <div class="overview-card-header">
         <div>
           <div class="overview-card-title">今日</div>
@@ -3196,37 +3260,22 @@ function renderOverviewToday() {
   document.getElementById('overviewTodayDate').textContent =
     `${today} 星期${weekdays[d.getDay()]}`;
 
-  const labels = {
-    1: '重要 紧急',
-    2: '重要 不紧急',
-    3: '紧急 不重要',
-    4: '都不'
-  };
-
-  let html = '<div class="overview-quadrants">';
-  for (let q = 1; q <= 4; q++) {
-    const tasks = sortTasks(filterByCategory(state.tasks.filter(t => t.date === today && t.quadrant === q)));
-
-    html += `<div class="overview-quadrant" data-q="${q}">
-      <div class="overview-quadrant-title">${labels[q]}</div>
-      <div class="overview-quadrant-body">`;
-
-    if (tasks.length === 0) {
-      html += `<div style="color:var(--ink-light);font-size:11px;padding:4px 0;font-style:italic">—</div>`;
-    } else {
-      tasks.forEach(t => {
-        const project = t.projectId ? state.projects.find(p => p.id === t.projectId) : null;
-        const dot = project
-          ? `<span class="proj-dot" style="background:${project.color}"></span>`
-          : '';
-        const timeTag = t.time ? `<span class="task-time">${t.time}</span>` : '';
-        html += `<div class="overview-mini-task ${t.done ? 'done' : ''}"
-                      ondblclick="switchTab('day')">
-                   ${dot}${timeTag}${escapeHtml(t.title)}
-                 </div>`;
-      });
-    }
-    html += '</div></div>';
+  const tasks = sortTasks(filterByCategory(state.tasks.filter(t => t.date === today)));
+  let html = '<div class="overview-checklist">';
+  if (tasks.length === 0) {
+    html += '<div class="overview-checklist-empty">今天还没有任务</div>';
+  } else {
+    tasks.forEach(t => {
+      const project = t.projectId ? state.projects.find(p => p.id === t.projectId) : null;
+      const dot = project ? `<span class="proj-dot" style="background:${project.color}"></span>` : '';
+      const timeTag = t.time ? `<span class="task-time">${t.time}</span>` : '';
+      const qLabels = {1:'🔴',2:'🟡',3:'🔵',4:'⚪'};
+      const qTag = `<span style="font-size:10px">${qLabels[t.quadrant||2]}</span>`;
+      html += `<label class="overview-check-item ${t.done ? 'done' : ''}">
+        <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleOverviewTask('${t.id}')">
+        <span class="overview-check-text">${qTag} ${dot}${timeTag}${escapeHtml(t.title)}</span>
+      </label>`;
+    });
   }
   html += '</div>';
   document.getElementById('overviewToday').innerHTML = html;
@@ -3240,36 +3289,37 @@ function renderOverviewWeek() {
 
   const today = fmt(new Date());
   const dayNames = ['一', '二', '三', '四', '五', '六', '日'];
+  const weekStartStr = fmt(start);
+  const weekEndStr = fmt(end);
+  const weekTasks = sortTasks(filterByCategory(state.tasks.filter(t => t.date >= weekStartStr && t.date <= weekEndStr)));
 
-  let html = '<div class="overview-week-mini">';
-  for (let i = 0; i < 7; i++) {
-    const d = addDays(start, i);
-    const dateStr = fmt(d);
-    const isToday = dateStr === today;
-    const tasks = sortTasks(filterByCategory(state.tasks.filter(t => t.date === dateStr)));
-
-    html += `<div class="overview-week-day ${isToday ? 'today' : ''}">
-      <div class="overview-week-day-header">${dayNames[i]} ${d.getMonth() + 1}/${d.getDate()}</div>
-      <div class="overview-week-day-body">`;
-
-    if (tasks.length === 0) {
-      html += `<div style="color:var(--ink-light);font-size:10px;text-align:center;padding:4px 0">—</div>`;
-    } else {
-      tasks.forEach(t => {
-        const timeTag = t.time ? `<span class="task-time">${t.time}</span>` : '';
-        const q = t.quadrant || 2;
-        const quadTag = `<span class="quad-tag" data-q="${q}" style="font-size:9px;padding:0 3px;margin-right:2px">${QUAD_LABELS[q]}</span>`;
-        html += `<div class="overview-week-task ${t.done ? 'done' : ''}"
-                      title="${escapeHtml(t.title)}"
-                      ondblclick="switchTab('week')">
-                   ${quadTag}${timeTag}${escapeHtml(t.title)}
-                 </div>`;
-      });
-    }
-    html += '</div></div>';
+  let html = '<div class="overview-checklist">';
+  if (weekTasks.length === 0) {
+    html += '<div class="overview-checklist-empty">本周还没有任务</div>';
+  } else {
+    weekTasks.forEach(t => {
+      const project = t.projectId ? state.projects.find(p => p.id === t.projectId) : null;
+      const dot = project ? `<span class="proj-dot" style="background:${project.color}"></span>` : '';
+      const dateD = parseDate(t.date);
+      const dayLabel = `${dateD.getMonth()+1}/${dateD.getDate()} 周${dayNames[(dateD.getDay()+6)%7]}`;
+      const isOverdue = !t.done && t.date < today;
+      const isToday = t.date === today;
+      const dateClass = isOverdue ? 'color:var(--red)' : (isToday ? 'color:var(--accent)' : 'color:var(--ink-light)');
+      html += `<label class="overview-check-item ${t.done ? 'done' : ''}">
+        <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleOverviewTask('${t.id}')">
+        <span class="overview-check-text">${dot}<span style="font-size:10px;${dateClass};margin-right:4px">${dayLabel}</span>${escapeHtml(t.title)}</span>
+      </label>`;
+    });
   }
   html += '</div>';
   document.getElementById('overviewWeek').innerHTML = html;
+}
+
+function toggleOverviewTask(id) {
+  const t = state.tasks.find(x => x.id === id);
+  if (t) t.done = !t.done;
+  saveState();
+  renderOverview();
 }
 
 function renderOverviewProjects() {
