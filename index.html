@@ -2289,6 +2289,7 @@
       <button class="gantt-filter-btn"         data-filter="done"    onclick="setGanttFilter('done')">已完成</button>
       <button class="gantt-filter-btn"         data-filter="overdue" onclick="setGanttFilter('overdue')">逾期</button>
     </div>
+    <button class="btn btn-sm btn-ghost" id="ganttDoneToggle" onclick="toggleHideGanttDone()">显示已完成</button>
     <span class="week-label" id="ganttRangeLabel"></span>
   </div>
   <div class="gantt-layout">
@@ -2582,6 +2583,7 @@ if (!state.categories || state.categories.length === 0) {
 }
 let editing = { type: null, id: null, ctx: null };
 let ganttFilter = 'all'; // 'all' | 'active' | 'done' | 'overdue'
+let hideGanttDone = true; // 默认隐藏已完成
 let ganttEarliestStart = null; // renderGantt 时记录，供 resize handle 使用
 const GANTT_WEEK_COL_WIDTH = 36;
 const GANTT_DAY_PX = GANTT_WEEK_COL_WIDTH / 7;
@@ -3216,6 +3218,16 @@ function setGanttFilter(filter) {
   renderGantt();
 }
 
+function toggleHideGanttDone() {
+  hideGanttDone = !hideGanttDone;
+  const btn = document.getElementById('ganttDoneToggle');
+  if (btn) {
+    btn.textContent = hideGanttDone ? '显示已完成' : '隐藏已完成';
+    btn.classList.toggle('btn-done-active', !hideGanttDone);
+  }
+  renderGantt();
+}
+
 // 渲染甘特图：按周为单位
 function renderGantt() {
   const months = parseInt(document.getElementById('ganttRange').value);
@@ -3233,6 +3245,8 @@ function renderGantt() {
   const todayStr = fmt(today);
 
   const filteredProjects = filterByCategory(state.projects.filter(p => {
+    // 隐藏已完成
+    if (hideGanttDone && p.done && ganttFilter !== 'done') return false;
     if (ganttFilter === 'all') return true;
     const isOverdue = !p.done && p.end < todayStr;
     if (ganttFilter === 'overdue') return isOverdue;
