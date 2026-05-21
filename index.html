@@ -2481,6 +2481,13 @@
       <label>备注（可选）</label>
       <textarea id="projectNotes" rows="2"></textarea>
     </div>
+    <div class="form-group">
+      <label>关联任务/项目</label>
+      <div id="projectLinkedList" style="margin-bottom:6px"></div>
+      <select id="projectLinkSelect" onchange="addProjectLink(this.value);this.value=''">
+        <option value="">+ 添加关联…</option>
+      </select>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="projectDelete" onclick="deleteProject()" style="display:none">删除</button>
       <button class="btn btn-ghost" onclick="closeModal('projectModal')">取消</button>
@@ -2508,6 +2515,13 @@
       <select id="taskCategory"></select>
     </div>
     <div id="taskExtraField"></div>
+    <div class="form-group">
+      <label>关联其他任务/项目</label>
+      <div id="taskLinkedList" style="margin-bottom:6px"></div>
+      <select id="taskLinkSelect" onchange="addTaskLink(this.value);this.value=''">
+        <option value="">+ 添加关联…</option>
+      </select>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="taskDelete" onclick="deleteTask()" style="display:none">删除</button>
       <button class="btn btn-ghost" id="taskCancelBtn" onclick="closeModal('taskModal')">取消</button>
@@ -2798,6 +2812,9 @@ function openProjectModal(id) {
     document.getElementById('projectDelete').style.display = '';
     buildColorPicker();
     refreshCategorySelect('projectCategory', p.category);
+    _tempLinks = [...(p.linkedIds || [])];
+    renderLinkedList('projectLinkedList', 'projectLinkSelect', id);
+    refreshLinkSelect('projectLinkSelect', id);
   } else {
     editing = { type: 'project', id: null };
     document.getElementById('projectModalTitle').textContent = '新增长期项目';
@@ -2811,9 +2828,101 @@ function openProjectModal(id) {
     document.getElementById('projectDelete').style.display = 'none';
     buildColorPicker();
     refreshCategorySelect('projectCategory', null);
+    _tempLinks = [];
+    renderLinkedList('projectLinkedList', 'projectLinkSelect', null);
+    refreshLinkSelect('projectLinkSelect', null);
   }
   openModal('projectModal');
   setTimeout(() => document.getElementById('projectName').focus(), 50);
+}
+
+// =============== 关联管理 ===============
+let _tempLinks = []; // 当前弹窗临时关联列表
+
+function getAllItems() {
+  const items = [];
+  state.projects.forEach(p => items.push({ id: p.id, type: 'project', title: `[项目] ${p.name}` }));
+  state.tasks.forEach(t => items.push({ id: t.id, type: 'task', title: `[任务] ${t.title}` }));
+  return items;
+}
+
+function refreshLinkSelect(selectId, excludeId) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  sel.innerHTML = '<option value="">+ 添加关联…</option>';
+  getAllItems().forEach(item => {
+    if (item.id === excludeId) return;
+    if (_tempLinks.includes(item.id)) return;
+    const o = document.createElement('option');
+    o.value = item.id;
+    o.textContent = item.title;
+    sel.appendChild(o);
+  });
+}
+
+function renderLinkedList(containerId, selectId, excludeId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  if (_tempLinks.length === 0) {
+    container.innerHTML = '<span style="font-size:11px;color:var(--ink-light)">暂无关联</span>';
+    return;
+  }
+  container.innerHTML = '';
+  _tempLinks.forEach(lid => {
+    const item = getAllItems().find(x => x.id === lid);
+    if (!item) return;
+    const tag = document.createElement('span');
+    tag.style.cssText = 'display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:10px;background:var(--line);margin:2px 4px 2px 0';
+    tag.textContent = item.title;
+    const rm = document.createElement('button');
+    rm.style.cssText = 'border:none;background:none;cursor:pointer;font-size:12px;color:var(--red);padding:0 2px';
+    rm.textContent = '×';
+    rm.onclick = () => { _tempLinks = _tempLinks.filter(x => x !== lid); renderLinkedList(containerId, selectId, excludeId); refreshLinkSelect(selectId, excludeId); };
+    tag.appendChild(rm);
+    container.appendChild(tag);
+  });
+}
+
+function addProjectLink(id) {
+  if (!id) return;
+  if (!_tempLinks.includes(id)) _tempLinks.push(id);
+  renderLinkedList('projectLinkedList', 'projectLinkSelect', editing.id);
+  refreshLinkSelect('projectLinkSelect', editing.id);
+}
+
+function addTaskLink(id) {
+  if (!id) return;
+  if (!_tempLinks.includes(id)) _tempLinks.push(id);
+  renderLinkedList('taskLinkedList', 'taskLinkSelect', editing.id);
+  refreshLinkSelect('taskLinkSelect', editing.id);
+}
+
+function saveLinks(itemId, newLinks) {
+  // 双向关联：把 itemId 加入对方的 linkedIds
+  const oldLinks = getLinkedIds(itemId);
+  // 移除旧关联中不再存在的
+  oldLinks.forEach(lid => {
+    if (!newLinks.includes(lid)) {
+      const target = state.projects.find(x => x.id === lid) || state.tasks.find(x => x.id === lid);
+      if (target && target.linkedIds) target.linkedIds = target.linkedIds.filter(x => x !== itemId);
+    }
+  });
+  // 添加新关联
+  newLinks.forEach(lid => {
+    const target = state.projects.find(x => x.id === lid) || state.tasks.find(x => x.id === lid);
+    if (target) {
+      if (!target.linkedIds) target.linkedIds = [];
+      if (!target.linkedIds.includes(itemId)) target.linkedIds.push(itemId);
+    }
+  });
+}
+
+function getLinkedIds(itemId) {
+  const p = state.projects.find(x => x.id === itemId);
+  if (p) return p.linkedIds || [];
+  const t = state.tasks.find(x => x.id === itemId);
+  if (t) return t.linkedIds || [];
+  return [];
 }
 
 function saveProject() {
@@ -2827,11 +2936,14 @@ function saveProject() {
   if (parseDate(end) < parseDate(start)) return alert('结束日期不能早于开始日期');
   if (editing.id) {
     const p = state.projects.find(x => x.id === editing.id);
-    Object.assign(p, { name, start, end, color: selectedColor, notes, category, priority });
+    Object.assign(p, { name, start, end, color: selectedColor, notes, category, priority, linkedIds: [..._tempLinks] });
+    saveLinks(editing.id, _tempLinks);
   } else {
+    const newId = uid();
     state.projects.push({
-      id: uid(), name, start, end, color: selectedColor, notes, done: false, category, priority
+      id: newId, name, start, end, color: selectedColor, notes, done: false, category, priority, linkedIds: [..._tempLinks]
     });
+    saveLinks(newId, _tempLinks);
   }
   saveState();
   closeModal('projectModal');
@@ -4124,6 +4236,9 @@ function openTaskModal(type, ctx, id) {
     document.getElementById('taskProject').value = t.projectId || '';
     refreshCategorySelect('taskCategory', t.category);
     document.getElementById('taskDelete').style.display = '';
+    _tempLinks = [...(t.linkedIds || [])];
+    renderLinkedList('taskLinkedList', 'taskLinkSelect', id);
+    refreshLinkSelect('taskLinkSelect', id);
 
     if (isWeek) {
       document.getElementById('taskExtraField').innerHTML = _weekExtraHTML({
@@ -4149,6 +4264,9 @@ function openTaskModal(type, ctx, id) {
     document.getElementById('taskProject').value = '';
     refreshCategorySelect('taskCategory', null);
     document.getElementById('taskDelete').style.display = 'none';
+    _tempLinks = [];
+    renderLinkedList('taskLinkedList', 'taskLinkSelect', null);
+    refreshLinkSelect('taskLinkSelect', null);
 
     const defaultDate = isWeek ? (ctx || fmt(new Date())) : currentDay;
     const defaultQuad = type === 'day' ? ctx : 2;
@@ -4292,21 +4410,26 @@ function saveTask() {
       t.startDate = startDate;
       t.endDate   = endDate;
     }
+    t.linkedIds = [..._tempLinks];
+    saveLinks(editing.id, _tempLinks);
   } else {
+    const newId = uid();
     const newTask = {
-      id: uid(), title, projectId,
+      id: newId, title, projectId,
       category: document.getElementById('taskCategory').value || null,
       startTime, endTime,
       time: startTime, // 向后兼容
       date, quadrant,
       notes: notes || null,
-      done: false, order: Date.now()
+      done: false, order: Date.now(),
+      linkedIds: [..._tempLinks]
     };
     if (isWeek) {
       newTask.startDate = startDate;
       newTask.endDate   = endDate;
     }
     state.tasks.push(newTask);
+    if (_tempLinks.length > 0) saveLinks(newId, _tempLinks);
   }
   saveState();
   closeModal('taskModal');
